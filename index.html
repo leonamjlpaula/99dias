@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>99 Dias — Corpo, Mente e Espírito</title>
+<style>
+  :root {
+    --bg: #f6f5f2;
+    --card-bg: #ffffff;
+    --text: #1f1c1a;
+    --text-dim: #6b6560;
+    --border: #e4e0da;
+    --corpo: #3b6fd9;
+    --corpo-bg: #e4ecfb;
+    --mente: #e0a800;
+    --mente-bg: #fbf1d0;
+    --espirito: #7c4fd9;
+    --espirito-bg: #ece3fb;
+    --accent: #1f1c1a;
+    --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #171513;
+      --card-bg: #211e1b;
+      --text: #f2efe9;
+      --text-dim: #a39c93;
+      --border: #38332e;
+      --corpo-bg: #1e2a3f;
+      --mente-bg: #3a3116;
+      --espirito-bg: #2c2140;
+      --accent: #f2efe9;
+      --shadow: 0 1px 3px rgba(0,0,0,0.4);
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding-bottom: 60px;
+  }
+  .app { max-width: 760px; margin: 0 auto; padding: 24px 16px; }
+  header.top { margin-bottom: 24px; }
+  h1 { font-size: 22px; margin: 0 0 4px; letter-spacing: -0.01em; }
+  .subtitle { color: var(--text-dim); font-size: 14px; margin: 0 0 16px; }
+  .progress-row { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
+  .day-count { font-size: 28px; font-weight: 700; white-space: nowrap; }
+  .progress-bar-track { flex: 1; height: 10px; border-radius: 6px; background: var(--border); overflow: hidden; }
+  .progress-bar-fill { height: 100%; background: linear-gradient(90deg, var(--corpo), var(--mente), var(--espirito)); border-radius: 6px; transition: width 0.3s; }
+  .range-note { font-size: 12.5px; color: var(--text-dim); }
+
+  .card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px;
+    margin-bottom: 18px;
+    box-shadow: var(--shadow);
+  }
+  .card h2 { font-size: 15px; margin: 0 0 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .date-nav { display: flex; align-items: center; gap: 8px; }
+  .date-nav button {
+    border: 1px solid var(--border); background: transparent; color: var(--text);
+    border-radius: 8px; width: 30px; height: 30px; cursor: pointer; font-size: 15px;
+  }
+  .date-nav button:disabled { opacity: 0.3; cursor: default; }
+  .date-nav input[type="date"] {
+    border: 1px solid var(--border); border-radius: 8px; padding: 5px 8px;
+    background: var(--card-bg); color: var(--text); font-size: 13px;
+  }
+  .save-indicator { font-size: 12px; color: var(--text-dim); font-weight: 400; }
+
+  .field { margin-bottom: 14px; }
+  .field:last-child { margin-bottom: 0; }
+  .field label {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 13.5px; font-weight: 600; margin-bottom: 6px;
+  }
+  .dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+  .dot.corpo { background: var(--corpo); }
+  .dot.mente { background: var(--mente); }
+  .dot.espirito { background: var(--espirito); }
+  .field textarea {
+    width: 100%; min-height: 64px; resize: vertical;
+    border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px;
+    font-family: inherit; font-size: 14px; background: var(--bg); color: var(--text);
+  }
+  .field.corpo textarea:focus { border-color: var(--corpo); }
+  .field.mente textarea:focus { border-color: var(--mente); }
+  .field.espirito textarea:focus { border-color: var(--espirito); }
+  textarea:focus { outline: none; }
+
+  .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .stat-box { text-align: center; padding: 10px 4px; border-radius: 10px; background: var(--bg); }
+  .stat-box .num { font-size: 22px; font-weight: 700; }
+  .stat-box .label { font-size: 11.5px; color: var(--text-dim); margin-top: 2px; }
+
+  .heatmap { display: grid; grid-template-columns: repeat(11, 1fr); gap: 5px; }
+  .heat-cell {
+    aspect-ratio: 1; border-radius: 5px; border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 9.5px; color: var(--text-dim); cursor: pointer; background: var(--bg);
+    position: relative;
+  }
+  .heat-cell.future { cursor: default; opacity: 0.35; }
+  .heat-cell.selected { box-shadow: 0 0 0 2px var(--accent) inset; }
+  .heat-cell.level-1 { background: var(--corpo-bg); }
+  .heat-cell.level-2 { background: linear-gradient(135deg, var(--corpo-bg), var(--mente-bg)); }
+  .heat-cell.level-3 { background: linear-gradient(135deg, var(--corpo), var(--mente), var(--espirito)); color: #fff; font-weight: 600; }
+  .legend { display: flex; gap: 14px; margin-top: 10px; font-size: 11.5px; color: var(--text-dim); flex-wrap: wrap; }
+  .legend span { display: inline-flex; align-items: center; gap: 5px; }
+  .legend i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; border: 1px solid var(--border); }
+
+  .history-list { display: flex; flex-direction: column; gap: 8px; max-height: 320px; overflow-y: auto; }
+  .history-item { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; cursor: pointer; }
+  .history-item:hover { border-color: var(--text-dim); }
+  .history-item .h-date { font-size: 12.5px; font-weight: 700; margin-bottom: 4px; display: flex; justify-content: space-between; }
+  .history-item .h-preview { font-size: 12px; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .empty-note { font-size: 13px; color: var(--text-dim); text-align: center; padding: 20px 0; }
+
+  .footer-actions { display: flex; gap: 10px; justify-content: center; margin-top: 10px; }
+  .footer-actions button {
+    font-size: 12.5px; padding: 7px 14px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--card-bg); color: var(--text-dim); cursor: pointer;
+  }
+  .footer-actions button:hover { color: var(--text); }
+  input[type="file"] { display: none; }
+
+  .toast {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    background: var(--accent); color: var(--bg); padding: 9px 18px; border-radius: 20px;
+    font-size: 13px; opacity: 0; pointer-events: none; transition: opacity 0.25s;
+    z-index: 1100;
+  }
+  .toast.show { opacity: 1; }
+
+  .share-trigger {
+    display: block; margin: 16px auto 0; font-size: 13px; padding: 8px 18px;
+    border-radius: 20px; border: 1px solid var(--border); background: var(--bg);
+    color: var(--text); cursor: pointer;
+  }
+  .share-trigger:hover { border-color: var(--accent); }
+
+  .share-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.65);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 1000; padding: 24px;
+  }
+  .share-overlay.hidden { display: none; }
+  .share-modal { display: flex; flex-direction: column; align-items: center; gap: 14px; max-height: 92vh; }
+  #shareCanvas { width: min(280px, 72vw); height: auto; border-radius: 18px; box-shadow: 0 8px 30px rgba(0,0,0,0.5); }
+  .share-actions { display: flex; gap: 10px; }
+  .share-actions button {
+    font-size: 13px; padding: 9px 18px; border-radius: 8px; border: none;
+    cursor: pointer; font-weight: 600;
+  }
+  #shareDownload { background: #ffffff; color: #111; }
+  #shareClose { background: transparent; color: #fff; border: 1px solid rgba(255,255,255,0.35); }
+
+  @media (max-width: 480px) {
+    .heatmap { grid-template-columns: repeat(9, 1fr); }
+    .day-count { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <h1>99 Dias — Corpo, Mente e Espírito</h1>
+    <p class="subtitle">Um registro diário do desafio. Tudo salvo localmente neste navegador.</p>
+    <div class="progress-row">
+      <div class="day-count" id="dayCount">Dia 1/99</div>
+      <div class="progress-bar-track"><div class="progress-bar-fill" id="progressFill" style="width:0%"></div></div>
+    </div>
+    <div class="range-note" id="rangeNote"></div>
+  </header>
+
+  <section class="card">
+    <h2>
+      <span id="formTitle">Hoje</span>
+      <span style="display:flex; align-items:center; gap:10px;">
+        <span class="save-indicator" id="saveIndicator"></span>
+        <span class="date-nav">
+          <button id="prevDay" title="Dia anterior">‹</button>
+          <input type="date" id="datePicker">
+          <button id="nextDay" title="Próximo dia">›</button>
+        </span>
+      </span>
+    </h2>
+
+    <div class="field corpo">
+      <label><span class="dot corpo"></span>Corpo — dieta e exercício</label>
+      <textarea id="corpoInput" placeholder="Ex: treino de perna 45min, almoço com proteína e salada, caminhada de 5km..."></textarea>
+    </div>
+    <div class="field mente">
+      <label><span class="dot mente"></span>Mente — leitura, estudo técnico e Tothem Apps</label>
+      <textarea id="menteInput" placeholder="Ex: 30min lendo [livro], estudei sobre X, defini próximo passo da Tothem Apps..."></textarea>
+    </div>
+    <div class="field espirito">
+      <label><span class="dot espirito"></span>Espírito — práticas da escola de sabedoria</label>
+      <textarea id="espiritoInput" placeholder="Ex: 10min de meditação, exercício de respiração, revisei anotações do último encontro..."></textarea>
+    </div>
+    <button class="share-trigger" id="shareBtn">Gerar card para Stories</button>
+  </section>
+
+  <section class="card">
+    <h2>Progresso</h2>
+    <div class="stats-grid">
+      <div class="stat-box"><div class="num" id="statDay">1/99</div><div class="label">Dia atual</div></div>
+      <div class="stat-box"><div class="num" id="statStreak">0</div><div class="label">Sequência completa</div></div>
+      <div class="stat-box"><div class="num" id="statTotal">0/99</div><div class="label">Dias registrados</div></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Mapa dos 99 dias</h2>
+    <div class="heatmap" id="heatmap"></div>
+    <div class="legend">
+      <span><i style="background:var(--bg)"></i>Vazio</span>
+      <span><i style="background:var(--corpo-bg)"></i>1 área</span>
+      <span><i style="background:linear-gradient(135deg, var(--corpo-bg), var(--mente-bg))"></i>2 áreas</span>
+      <span><i style="background:linear-gradient(135deg, var(--corpo), var(--mente), var(--espirito))"></i>3 áreas (completo)</span>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Histórico recente</h2>
+    <div class="history-list" id="historyList"></div>
+  </section>
+
+  <div class="footer-actions">
+    <button id="exportBtn">Exportar backup (JSON)</button>
+    <button id="importBtn">Importar backup</button>
+    <input type="file" id="importFile" accept="application/json">
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="share-overlay hidden" id="shareOverlay">
+  <div class="share-modal">
+    <canvas id="shareCanvas" width="1080" height="1920"></canvas>
+    <div class="share-actions">
+      <button id="shareDownload">Baixar imagem</button>
+      <button id="shareClose">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const STORAGE_KEY = '99dias-v1';
+  const TOTAL_DAYS = 99;
+
+  function toISO(date) {
+    const y = date.getFullYear(), m = String(date.getMonth() + 1).padStart(2, '0'), d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+  function fromISO(iso) {
+    const [y, m, d] = iso.split('-').map(Number);
+    return new Date(y, m - 1, d);
+  }
+  function todayISO() { return toISO(new Date()); }
+  function addDays(iso, n) { const d = fromISO(iso); d.setDate(d.getDate() + n); return toISO(d); }
+  function dayNumber(iso, startIso) { return Math.round((fromISO(iso) - fromISO(startIso)) / 86400000) + 1; }
+  function fmtDate(iso) {
+    const d = fromISO(iso);
+    return d.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' });
+  }
+
+  function loadState() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch (e) { console.warn('Falha ao ler localStorage', e); }
+    return { startDate: todayISO(), entries: {} };
+  }
+  function saveState() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      return true;
+    } catch (e) {
+      console.error('Falha ao salvar localStorage', e);
+      showToast('Erro ao salvar — veja o console');
+      return false;
+    }
+  }
+
+  let state = loadState();
+  let selectedDate = todayISO();
+  if (selectedDate < state.startDate) selectedDate = state.startDate;
+
+  const endDate = () => addDays(state.startDate, TOTAL_DAYS - 1);
+  const maxSelectable = () => {
+    const t = todayISO();
+    const e = endDate();
+    return t < e ? t : e;
+  };
+
+  function levelOf(iso) {
+    const e = state.entries[iso];
+    if (!e) return 0;
+    return ['corpo', 'mente', 'espirito'].filter(k => e[k] && e[k].trim().length > 0).length;
+  }
+
+  function getEntry(iso) {
+    return state.entries[iso] || { corpo: '', mente: '', espirito: '', updatedAt: null };
+  }
+
+  // --- Elements ---
+  const el = {
+    dayCount: document.getElementById('dayCount'),
+    progressFill: document.getElementById('progressFill'),
+    rangeNote: document.getElementById('rangeNote'),
+    formTitle: document.getElementById('formTitle'),
+    saveIndicator: document.getElementById('saveIndicator'),
+    prevDay: document.getElementById('prevDay'),
+    nextDay: document.getElementById('nextDay'),
+    datePicker: document.getElementById('datePicker'),
+    corpoInput: document.getElementById('corpoInput'),
+    menteInput: document.getElementById('menteInput'),
+    espiritoInput: document.getElementById('espiritoInput'),
+    statDay: document.getElementById('statDay'),
+    statStreak: document.getElementById('statStreak'),
+    statTotal: document.getElementById('statTotal'),
+    heatmap: document.getElementById('heatmap'),
+    historyList: document.getElementById('historyList'),
+    exportBtn: document.getElementById('exportBtn'),
+    importBtn: document.getElementById('importBtn'),
+    importFile: document.getElementById('importFile'),
+    toast: document.getElementById('toast'),
+    shareBtn: document.getElementById('shareBtn'),
+    shareOverlay: document.getElementById('shareOverlay'),
+    shareCanvas: document.getElementById('shareCanvas'),
+    shareDownload: document.getElementById('shareDownload'),
+    shareClose: document.getElementById('shareClose'),
+  };
+
+  let toastTimer = null;
+  function showToast(msg) {
+    el.toast.textContent = msg;
+    el.toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.toast.classList.remove('show'), 1800);
+  }
+
+  function renderHeader() {
+    const n = dayNumber(todayISO(), state.startDate);
+    const clampedN = Math.max(1, Math.min(n, TOTAL_DAYS));
+    el.dayCount.textContent = n > TOTAL_DAYS ? `Concluído! (${TOTAL_DAYS}/${TOTAL_DAYS})` : `Dia ${clampedN}/${TOTAL_DAYS}`;
+    el.progressFill.style.width = `${(clampedN / TOTAL_DAYS) * 100}%`;
+    el.rangeNote.textContent = `Início: ${fmtDate(state.startDate)} · Fim previsto: ${fmtDate(endDate())}`;
+  }
+
+  function renderForm() {
+    const entry = getEntry(selectedDate);
+    const n = dayNumber(selectedDate, state.startDate);
+    el.formTitle.textContent = selectedDate === todayISO() ? `Hoje — Dia ${n}` : `Dia ${n} — ${fmtDate(selectedDate)}`;
+    el.corpoInput.value = entry.corpo || '';
+    el.menteInput.value = entry.mente || '';
+    el.espiritoInput.value = entry.espirito || '';
+    el.datePicker.value = selectedDate;
+    el.datePicker.min = state.startDate;
+    el.datePicker.max = maxSelectable();
+    el.prevDay.disabled = selectedDate <= state.startDate;
+    el.nextDay.disabled = selectedDate >= maxSelectable();
+    el.saveIndicator.textContent = entry.updatedAt ? `Salvo às ${new Date(entry.updatedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}` : '';
+  }
+
+  function computeStreakEndingAt(iso) {
+    let streak = 0;
+    let cursor = iso;
+    while (cursor >= state.startDate && levelOf(cursor) === 3) {
+      streak++;
+      cursor = addDays(cursor, -1);
+    }
+    return streak;
+  }
+
+  function renderStats() {
+    const n = dayNumber(todayISO(), state.startDate);
+    const clampedN = Math.max(1, Math.min(n, TOTAL_DAYS));
+    el.statDay.textContent = `${clampedN}/${TOTAL_DAYS}`;
+
+    const streakRef = todayISO() < endDate() ? todayISO() : endDate();
+    el.statStreak.textContent = computeStreakEndingAt(streakRef);
+
+    let total = 0;
+    let d = state.startDate;
+    const last = maxSelectable();
+    while (d <= last) {
+      if (levelOf(d) > 0) total++;
+      d = addDays(d, 1);
+    }
+    el.statTotal.textContent = `${total}/${TOTAL_DAYS}`;
+  }
+
+  function renderHeatmap() {
+    el.heatmap.innerHTML = '';
+    const today = todayISO();
+    for (let i = 0; i < TOTAL_DAYS; i++) {
+      const iso = addDays(state.startDate, i);
+      const level = levelOf(iso);
+      const cell = document.createElement('div');
+      cell.className = `heat-cell level-${level}`;
+      if (iso > today) cell.classList.add('future');
+      if (iso === selectedDate) cell.classList.add('selected');
+      cell.textContent = i + 1;
+      cell.title = `Dia ${i + 1} — ${fmtDate(iso)}`;
+      if (iso <= maxSelectable()) {
+        cell.addEventListener('click', () => {
+          selectedDate = iso;
+          renderAll();
+          document.querySelector('.card').scrollIntoView({ behavior: 'smooth' });
+        });
+      }
+      el.heatmap.appendChild(cell);
+    }
+  }
+
+  function renderHistory() {
+    el.historyList.innerHTML = '';
+    const isos = Object.keys(state.entries)
+      .filter(iso => levelOf(iso) > 0)
+      .sort((a, b) => b.localeCompare(a))
+      .slice(0, 30);
+    if (isos.length === 0) {
+      el.historyList.innerHTML = '<div class="empty-note">Nenhum registro ainda. Comece preenchendo o dia de hoje acima.</div>';
+      return;
+    }
+    isos.forEach(iso => {
+      const e = state.entries[iso];
+      const n = dayNumber(iso, state.startDate);
+      const preview = [e.corpo, e.mente, e.espirito].filter(Boolean).join(' · ');
+      const item = document.createElement('div');
+      item.className = 'history-item';
+      item.innerHTML = `<div class="h-date"><span>Dia ${n} — ${fmtDate(iso)}</span><span>${levelOf(iso)}/3</span></div><div class="h-preview">${preview.replace(/</g, '&lt;')}</div>`;
+      item.addEventListener('click', () => {
+        selectedDate = iso;
+        renderAll();
+        document.querySelector('.card').scrollIntoView({ behavior: 'smooth' });
+      });
+      el.historyList.appendChild(item);
+    });
+  }
+
+  function renderAll() {
+    renderHeader();
+    renderForm();
+    renderStats();
+    renderHeatmap();
+    renderHistory();
+  }
+
+  // --- Autosave ---
+  let saveTimer = null;
+  function scheduleSave() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => {
+      const entry = getEntry(selectedDate);
+      entry.corpo = el.corpoInput.value;
+      entry.mente = el.menteInput.value;
+      entry.espirito = el.espiritoInput.value;
+      entry.updatedAt = Date.now();
+      state.entries[selectedDate] = entry;
+      if (saveState()) {
+        el.saveIndicator.textContent = `Salvo às ${new Date(entry.updatedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+        renderHeatmap();
+        renderStats();
+        renderHistory();
+      }
+    }, 400);
+  }
+  [el.corpoInput, el.menteInput, el.espiritoInput].forEach(input => {
+    input.addEventListener('input', scheduleSave);
+  });
+
+  // --- Navigation ---
+  el.prevDay.addEventListener('click', () => {
+    const prev = addDays(selectedDate, -1);
+    if (prev >= state.startDate) { selectedDate = prev; renderAll(); }
+  });
+  el.nextDay.addEventListener('click', () => {
+    const next = addDays(selectedDate, 1);
+    if (next <= maxSelectable()) { selectedDate = next; renderAll(); }
+  });
+  el.datePicker.addEventListener('change', () => {
+    const v = el.datePicker.value;
+    if (v >= state.startDate && v <= maxSelectable()) { selectedDate = v; renderAll(); }
+  });
+
+  // --- Backup ---
+  el.exportBtn.addEventListener('click', () => {
+    const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `99dias-backup-${todayISO()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('Backup exportado');
+  });
+  el.importBtn.addEventListener('click', () => el.importFile.click());
+  el.importFile.addEventListener('change', (ev) => {
+    const file = ev.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(reader.result);
+        if (!parsed.startDate || !parsed.entries) throw new Error('formato inválido');
+        state = parsed;
+        saveState();
+        selectedDate = todayISO() < state.startDate ? state.startDate : todayISO();
+        renderAll();
+        showToast('Backup importado');
+      } catch (e) {
+        showToast('Arquivo inválido');
+        console.error(e);
+      }
+    };
+    reader.readAsText(file);
+    ev.target.value = '';
+  });
+
+  // --- Share card ---
+  const bgImage = new Image();
+  let bgImageLoaded = false;
+  bgImage.onload = () => { bgImageLoaded = true; };
+  bgImage.onerror = () => { console.warn('Falha ao carregar assets/story-bg.png, usando fundo alternativo'); };
+  bgImage.src = 'assets/story-bg.png';
+
+  function hexWithAlpha(hex, alpha) {
+    hex = hex.replace('#', '');
+    const r = parseInt(hex.substring(0, 2), 16), g = parseInt(hex.substring(2, 4), 16), b = parseInt(hex.substring(4, 6), 16);
+    return `rgba(${r},${g},${b},${alpha})`;
+  }
+  function roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function drawBackground(ctx, W, H, colors) {
+    ctx.fillStyle = '#0a090c';
+    ctx.fillRect(0, 0, W, H);
+
+    function blob(x, y, r, color, alpha) {
+      const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+      g.addColorStop(0, hexWithAlpha(color, alpha));
+      g.addColorStop(1, hexWithAlpha(color, 0));
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    blob(W * 0.15, H * 0.10, W * 0.62, colors.corpo, 0.55);
+    blob(W * 0.92, H * 0.40, W * 0.5, colors.mente, 0.38);
+    blob(W * 0.20, H * 0.88, W * 0.65, colors.espirito, 0.5);
+    blob(W * 0.95, H * 0.98, W * 0.42, colors.corpo, 0.28);
+
+    for (let i = 0; i < 3200; i++) {
+      const gx = Math.random() * W, gy = Math.random() * H;
+      const a = Math.random() * 0.05;
+      ctx.fillStyle = Math.random() > 0.5 ? `rgba(255,255,255,${a})` : `rgba(0,0,0,${a})`;
+      ctx.fillRect(gx, gy, 1.4, 1.4);
+    }
+
+    const vg = ctx.createRadialGradient(W / 2, H / 2, H * 0.32, W / 2, H / 2, H * 0.78);
+    vg.addColorStop(0, 'rgba(0,0,0,0)');
+    vg.addColorStop(1, 'rgba(0,0,0,0.6)');
+    ctx.fillStyle = vg;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  function drawShareCard(iso) {
+    const canvas = el.shareCanvas;
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+    const cx = W / 2;
+
+    const corpoColor = getComputedStyle(document.documentElement).getPropertyValue('--corpo').trim();
+    const menteColor = getComputedStyle(document.documentElement).getPropertyValue('--mente').trim();
+    const espiritoColor = getComputedStyle(document.documentElement).getPropertyValue('--espirito').trim();
+
+    if (bgImageLoaded) {
+      const scale = Math.max(W / bgImage.width, H / bgImage.height);
+      const sw = W / scale, sh = H / scale;
+      const sx = (bgImage.width - sw) / 2, sy = (bgImage.height - sh) / 2;
+      ctx.drawImage(bgImage, sx, sy, sw, sh, 0, 0, W, H);
+      ctx.fillStyle = 'rgba(0,0,0,0.12)';
+      ctx.fillRect(0, 0, W, H);
+    } else {
+      drawBackground(ctx, W, H, { corpo: corpoColor, mente: menteColor, espirito: espiritoColor });
+    }
+
+    ctx.textAlign = 'center';
+    ctx.shadowColor = 'rgba(0,0,0,0.55)';
+    ctx.shadowBlur = 24;
+    ctx.fillStyle = 'rgba(255,255,255,0.7)';
+    ctx.font = '600 34px -apple-system, sans-serif';
+    ctx.fillText('DESAFIO', cx, 160);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '800 88px -apple-system, sans-serif';
+    ctx.fillText('99 DIAS', cx, 258);
+
+    const n = Math.max(1, Math.min(dayNumber(iso, state.startDate), TOTAL_DAYS));
+    ctx.font = '800 210px -apple-system, sans-serif';
+    ctx.fillText(`DIA ${n}`, cx, 560);
+    ctx.font = '500 44px -apple-system, sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.7)';
+    ctx.fillText(`de ${TOTAL_DAYS}`, cx, 628);
+    ctx.shadowBlur = 0;
+
+    ctx.fillStyle = 'rgba(0,0,0,0.32)';
+    roundRect(ctx, cx - 430, 660, 860, 560, 40); ctx.fill();
+
+    const barW = 760, barH = 22, barX = cx - barW / 2, barY = 700;
+    ctx.fillStyle = 'rgba(255,255,255,0.15)';
+    roundRect(ctx, barX, barY, barW, barH, 11); ctx.fill();
+    const barGrad = ctx.createLinearGradient(barX, 0, barX + barW, 0);
+    barGrad.addColorStop(0, corpoColor); barGrad.addColorStop(0.5, menteColor); barGrad.addColorStop(1, espiritoColor);
+    ctx.fillStyle = barGrad;
+    roundRect(ctx, barX, barY, barW * (n / TOTAL_DAYS), barH, 11); ctx.fill();
+
+    const entry = getEntry(iso);
+    const areas = [
+      { label: 'Corpo', color: corpoColor, done: !!(entry.corpo && entry.corpo.trim()) },
+      { label: 'Mente', color: menteColor, done: !!(entry.mente && entry.mente.trim()) },
+      { label: 'Espírito', color: espiritoColor, done: !!(entry.espirito && entry.espirito.trim()) },
+    ];
+    let rowY = 830;
+    areas.forEach(a => {
+      ctx.beginPath();
+      ctx.arc(cx - 260, rowY, 34, 0, Math.PI * 2);
+      ctx.fillStyle = a.done ? a.color : 'rgba(255,255,255,0.12)';
+      ctx.fill();
+      if (!a.done) { ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.stroke(); }
+      if (a.done) {
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = 6; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        ctx.beginPath();
+        ctx.moveTo(cx - 275, rowY);
+        ctx.lineTo(cx - 265, rowY + 10);
+        ctx.lineTo(cx - 247, rowY - 12);
+        ctx.stroke();
+      }
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#fff';
+      ctx.font = '700 44px -apple-system, sans-serif';
+      ctx.fillText(a.label, cx - 210, rowY + 16);
+      ctx.textAlign = 'center';
+      rowY += 110;
+    });
+
+    const streak = computeStreakEndingAt(iso);
+    ctx.font = '600 40px -apple-system, sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.fillText(streak > 0 ? `🔥 Sequência de ${streak} dia${streak > 1 ? 's' : ''}` : 'Começando a sequência', cx, rowY + 40);
+
+    ctx.font = '500 34px -apple-system, sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    const dateStr = fromISO(iso).toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
+    ctx.fillText(dateStr, cx, H - 140);
+
+    ctx.font = '600 30px -apple-system, sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.fillText('Corpo · Mente · Espírito', cx, H - 80);
+  }
+
+  el.shareBtn.addEventListener('click', () => {
+    el.shareOverlay.classList.remove('hidden');
+    if (bgImageLoaded || bgImage.complete) {
+      drawShareCard(selectedDate);
+    } else {
+      bgImage.addEventListener('load', () => drawShareCard(selectedDate), { once: true });
+      drawShareCard(selectedDate);
+    }
+  });
+  el.shareClose.addEventListener('click', () => el.shareOverlay.classList.add('hidden'));
+  el.shareOverlay.addEventListener('click', (ev) => {
+    if (ev.target === el.shareOverlay) el.shareOverlay.classList.add('hidden');
+  });
+  el.shareDownload.addEventListener('click', () => {
+    const link = document.createElement('a');
+    link.download = `99dias-dia-${dayNumber(selectedDate, state.startDate)}.png`;
+    link.href = el.shareCanvas.toDataURL('image/png');
+    link.click();
+    showToast('Imagem baixada');
+  });
+
+  renderAll();
+})();
+</script>
+</body>
+</html>
