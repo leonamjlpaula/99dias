@@ -452,7 +452,10 @@
     const clampedN = Math.max(1, Math.min(n, TOTAL_DAYS));
     el.statDay.textContent = `${clampedN}/${TOTAL_DAYS}`;
 
-    const streakRef = todayISO() < endDate() ? todayISO() : endDate();
+    let streakRef = todayISO() < endDate() ? todayISO() : endDate();
+    if (streakRef === todayISO() && levelOf(streakRef) < 3) {
+      streakRef = addDays(streakRef, -1); // hoje ainda não acabou — mostra a sequência até ontem, não zera
+    }
     el.statStreak.textContent = computeStreakEndingAt(streakRef);
 
     let total = 0;
