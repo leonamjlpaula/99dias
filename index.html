@@ -201,7 +201,15 @@
       <div class="day-count" id="dayCount">Dia 1/99</div>
       <div class="progress-bar-track"><div class="progress-bar-fill" id="progressFill" style="width:0%"></div></div>
     </div>
-    <div class="range-note" id="rangeNote"></div>
+    <div class="range-note">
+      <span id="rangeNote"></span>
+      <button id="editStartBtn" class="share-trigger" style="display:inline;margin:0 0 0 6px;padding:2px 9px;font-size:11px;">editar início</button>
+    </div>
+    <div class="range-note" id="startDateEditRow" style="display:none;margin-top:6px;">
+      <input type="date" id="startDateInput" style="border:1px solid var(--border);border-radius:8px;padding:4px 8px;background:var(--card-bg);color:var(--text);font-size:12.5px;">
+      <button id="startDateSave" class="share-trigger" style="display:inline;margin:0 0 0 6px;padding:3px 10px;font-size:11px;">Salvar</button>
+      <button id="startDateCancel" class="share-trigger" style="display:inline;margin:0 0 0 4px;padding:3px 10px;font-size:11px;">Cancelar</button>
+    </div>
     <div class="account-row" id="accountRow" style="display:none;">
       <span id="accountEmail"></span><button id="signOutBtn">Sair</button>
     </div>
@@ -342,11 +350,7 @@
   if (selectedDate < state.startDate) selectedDate = state.startDate;
 
   const endDate = () => addDays(state.startDate, TOTAL_DAYS - 1);
-  const maxSelectable = () => {
-    const t = todayISO();
-    const e = endDate();
-    return t < e ? t : e;
-  };
+  const maxSelectable = () => endDate();
 
   function levelOf(iso) {
     const e = state.entries[iso];
@@ -394,6 +398,11 @@
     accountRow: document.getElementById('accountRow'),
     accountEmail: document.getElementById('accountEmail'),
     signOutBtn: document.getElementById('signOutBtn'),
+    editStartBtn: document.getElementById('editStartBtn'),
+    startDateEditRow: document.getElementById('startDateEditRow'),
+    startDateInput: document.getElementById('startDateInput'),
+    startDateSave: document.getElementById('startDateSave'),
+    startDateCancel: document.getElementById('startDateCancel'),
   };
 
   let toastTimer = null;
@@ -570,12 +579,25 @@
     el.authOverlay.classList.add('hidden');
 
     const localState = loadState();
-    let cloud = await fetchCloudState(currentUserId, localState.startDate);
-    if (Object.keys(cloud.entries).length === 0 && Object.keys(localState.entries || {}).length > 0) {
-      await migrateLocalToCloud(currentUserId, localState);
-      cloud = await fetchCloudState(currentUserId, localState.startDate);
+    const cloud = await fetchCloudState(currentUserId, localState.startDate);
+
+    // Merge: never let cloud silently clobber local edits that are newer or absent from the cloud.
+    const mergedEntries = { ...cloud.entries };
+    const toPush = {};
+    for (const [date, localEntry] of Object.entries(localState.entries || {})) {
+      const cloudEntry = cloud.entries[date];
+      const localHasContent = ['corpo', 'mente', 'espirito'].some(k => localEntry[k] && localEntry[k].trim());
+      if (!localHasContent) continue;
+      if (!cloudEntry || (localEntry.updatedAt || 0) > (cloudEntry.updatedAt || 0)) {
+        mergedEntries[date] = localEntry;
+        toPush[date] = localEntry;
+      }
     }
-    state = { startDate: cloud.startDate, entries: cloud.entries };
+    if (Object.keys(toPush).length > 0) {
+      await migrateLocalToCloud(currentUserId, { entries: toPush });
+    }
+
+    state = { startDate: cloud.startDate, entries: mergedEntries };
     saveState();
     selectedDate = todayISO();
     if (selectedDate < state.startDate) selectedDate = state.startDate;
@@ -612,6 +634,27 @@
   el.signOutBtn.addEventListener('click', async () => {
     await sb.auth.signOut();
     location.reload();
+  });
+
+  el.editStartBtn.addEventListener('click', () => {
+    el.startDateInput.value = state.startDate;
+    el.startDateEditRow.style.display = '';
+  });
+  el.startDateCancel.addEventListener('click', () => {
+    el.startDateEditRow.style.display = 'none';
+  });
+  el.startDateSave.addEventListener('click', async () => {
+    const v = el.startDateInput.value;
+    if (!v) return;
+    state.startDate = v;
+    if (selectedDate < v) selectedDate = v;
+    saveState();
+    if (currentUserId) {
+      await sb.from('settings').upsert({ user_id: currentUserId, start_date: v }, { onConflict: 'user_id' });
+    }
+    el.startDateEditRow.style.display = 'none';
+    renderAll();
+    showToast('Data de início atualizada');
   });
 
   // --- Autosave ---
