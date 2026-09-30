@@ -296,7 +296,7 @@
   <div class="share-modal">
     <canvas id="shareCanvas" width="1080" height="1920"></canvas>
     <div class="share-actions">
-      <button id="shareDownload">Baixar imagem</button>
+      <button id="shareDownload">Compartilhar / Salvar</button>
       <button id="shareClose">Fechar</button>
     </div>
   </div>
@@ -896,11 +896,30 @@
     if (ev.target === el.shareOverlay) el.shareOverlay.classList.add('hidden');
   });
   el.shareDownload.addEventListener('click', () => {
-    const link = document.createElement('a');
-    link.download = `99dias-dia-${dayNumber(selectedDate, state.startDate)}.png`;
-    link.href = el.shareCanvas.toDataURL('image/png');
-    link.click();
-    showToast('Imagem baixada');
+    const filename = `99dias-dia-${dayNumber(selectedDate, state.startDate)}.png`;
+    el.shareCanvas.toBlob(async (blob) => {
+      if (!blob) { showToast('Erro ao gerar imagem'); return; }
+      const file = new File([blob], filename, { type: 'image/png' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file], title: '99 Dias' });
+          return;
+        } catch (e) {
+          if (e.name === 'AbortError') return; // usuário cancelou o compartilhamento
+          console.error(e);
+        }
+      }
+      // Fallback (desktop / navegadores sem suporte a Web Share com arquivos)
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast('Imagem baixada');
+    }, 'image/png');
   });
 
   (async function init() {
