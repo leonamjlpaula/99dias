@@ -94,6 +94,22 @@
   .field.espirito textarea:focus { border-color: var(--espirito); }
   textarea:focus { outline: none; }
 
+  .rating { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 12px; color: var(--text-dim); }
+  .rating .rating-label { margin-right: 2px; }
+  .rating button {
+    width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--border);
+    background: transparent; color: var(--text); font-size: 13px; cursor: pointer; padding: 0;
+  }
+  .rating.corpo button.on { background: var(--corpo); border-color: var(--corpo); color: #fff; }
+  .rating.mente button.on { background: var(--mente); border-color: var(--mente); color: #fff; }
+  .rating.espirito button.on { background: var(--espirito); border-color: var(--espirito); color: #fff; }
+  .copy-prev {
+    display: block; margin: 0 0 14px auto; font-size: 12.5px; padding: 6px 14px;
+    border-radius: 20px; border: 1px solid var(--border); background: var(--bg);
+    color: var(--text); cursor: pointer;
+  }
+  .copy-prev:disabled { opacity: 0.4; cursor: default; }
+
   .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
   .stat-box { text-align: center; padding: 10px 4px; border-radius: 10px; background: var(--bg); }
   .stat-box .num { font-size: 22px; font-weight: 700; }
@@ -229,17 +245,22 @@
       </span>
     </h2>
 
+    <button class="copy-prev" id="copyPrevBtn">Copiar dia anterior</button>
+
     <div class="field corpo">
       <label><span class="dot corpo"></span>Corpo — dieta e exercício</label>
       <textarea id="corpoInput" placeholder="Ex: treino de perna 45min, almoço com proteína e salada, caminhada de 5km..."></textarea>
+      <div class="rating corpo" data-area="corpo"><span class="rating-label">Nota</span></div>
     </div>
     <div class="field mente">
       <label><span class="dot mente"></span>Mente — leitura, estudo técnico e Tothem Apps</label>
       <textarea id="menteInput" placeholder="Ex: 30min lendo [livro], estudei sobre X, defini próximo passo da Tothem Apps..."></textarea>
+      <div class="rating mente" data-area="mente"><span class="rating-label">Nota</span></div>
     </div>
     <div class="field espirito">
       <label><span class="dot espirito"></span>Espírito — práticas da escola de sabedoria</label>
       <textarea id="espiritoInput" placeholder="Ex: 10min de meditação, exercício de respiração, revisei anotações do último encontro..."></textarea>
+      <div class="rating espirito" data-area="espirito"><span class="rating-label">Nota</span></div>
     </div>
     <button class="share-trigger" id="shareBtn">Gerar card para Stories</button>
   </section>
@@ -360,7 +381,37 @@
   }
 
   function getEntry(iso) {
-    return state.entries[iso] || { corpo: '', mente: '', espirito: '', updatedAt: null };
+    const e = state.entries[iso] || { corpo: '', mente: '', espirito: '', updatedAt: null };
+    if (!e.notas) e.notas = { corpo: null, mente: null, espirito: null };
+    return e;
+  }
+
+  const AREAS = ['corpo', 'mente', 'espirito'];
+
+  // Builds the 0–5 rating buttons once; renderRatings() only toggles the highlighted state.
+  document.querySelectorAll('.rating').forEach(box => {
+    for (let v = 0; v <= 5; v++) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = v;
+      b.dataset.value = v;
+      b.title = `Nota ${v}`;
+      b.addEventListener('click', () => {
+        const entry = getEntry(selectedDate);
+        const area = box.dataset.area;
+        entry.notas[area] = entry.notas[area] === v ? null : v; // clicar de novo limpa a nota
+        commitEntry(entry);
+        renderRatings();
+      });
+      box.appendChild(b);
+    }
+  });
+  function renderRatings() {
+    const notas = getEntry(selectedDate).notas;
+    document.querySelectorAll('.rating').forEach(box => {
+      const cur = notas[box.dataset.area];
+      box.querySelectorAll('button').forEach(b => b.classList.toggle('on', cur !== null && cur !== undefined && Number(b.dataset.value) === cur));
+    });
   }
 
   // --- Elements ---
@@ -376,6 +427,7 @@
     corpoInput: document.getElementById('corpoInput'),
     menteInput: document.getElementById('menteInput'),
     espiritoInput: document.getElementById('espiritoInput'),
+    copyPrevBtn: document.getElementById('copyPrevBtn'),
     statDay: document.getElementById('statDay'),
     statStreak: document.getElementById('statStreak'),
     statTotal: document.getElementById('statTotal'),
@@ -429,6 +481,8 @@
     el.corpoInput.value = entry.corpo || '';
     el.menteInput.value = entry.mente || '';
     el.espiritoInput.value = entry.espirito || '';
+    renderRatings();
+    el.copyPrevBtn.disabled = addDays(selectedDate, -1) < state.startDate;
     el.datePicker.value = selectedDate;
     el.datePicker.min = state.startDate;
     el.datePicker.max = maxSelectable();
@@ -535,11 +589,12 @@
       startDate = fallbackStartDate || todayISO();
       await sb.from('settings').insert({ user_id: userId, start_date: startDate });
     }
-    const { data: rows } = await sb.from('entries').select('date,corpo,mente,espirito,updated_at').eq('user_id', userId);
+    const { data: rows } = await sb.from('entries').select('*').eq('user_id', userId);
     const entries = {};
     (rows || []).forEach(r => {
       entries[r.date] = {
         corpo: r.corpo || '', mente: r.mente || '', espirito: r.espirito || '',
+        notas: { corpo: r.nota_corpo ?? null, mente: r.nota_mente ?? null, espirito: r.nota_espirito ?? null },
         updatedAt: r.updated_at ? new Date(r.updated_at).getTime() : null,
       };
     });
@@ -549,27 +604,43 @@
   async function migrateLocalToCloud(userId, localState) {
     const dates = Object.keys(localState.entries || {});
     if (dates.length === 0) return;
-    const rows = dates.map(d => ({
+    const rows = dates.map(d => entryRow(userId, d, localState.entries[d]));
+    await upsertEntries(rows);
+  }
+
+  // As colunas nota_* precisam existir na tabela `entries` (ver README). Sem elas, grava só o texto.
+  let notesSupported = true;
+  function entryRow(userId, date, e) {
+    const row = {
       user_id: userId,
-      date: d,
-      corpo: localState.entries[d].corpo || '',
-      mente: localState.entries[d].mente || '',
-      espirito: localState.entries[d].espirito || '',
-      updated_at: localState.entries[d].updatedAt ? new Date(localState.entries[d].updatedAt).toISOString() : new Date().toISOString(),
-    }));
-    await sb.from('entries').upsert(rows, { onConflict: 'user_id,date' });
+      date,
+      corpo: e.corpo || '',
+      mente: e.mente || '',
+      espirito: e.espirito || '',
+      updated_at: e.updatedAt ? new Date(e.updatedAt).toISOString() : new Date().toISOString(),
+    };
+    if (notesSupported) {
+      const n = e.notas || {};
+      row.nota_corpo = n.corpo ?? null;
+      row.nota_mente = n.mente ?? null;
+      row.nota_espirito = n.espirito ?? null;
+    }
+    return row;
+  }
+  async function upsertEntries(rows) {
+    let res = await sb.from('entries').upsert(rows, { onConflict: 'user_id,date' });
+    if (res.error && notesSupported && /nota_/.test(res.error.message || '')) {
+      notesSupported = false;
+      console.warn('Colunas nota_* ausentes no Supabase; notas ficam só neste aparelho.');
+      const stripped = rows.map(({ nota_corpo, nota_mente, nota_espirito, ...rest }) => rest);
+      res = await sb.from('entries').upsert(stripped, { onConflict: 'user_id,date' });
+    }
+    return res;
   }
 
   async function syncEntryToCloud(iso, entry) {
     if (!currentUserId) return;
-    const { error } = await sb.from('entries').upsert({
-      user_id: currentUserId,
-      date: iso,
-      corpo: entry.corpo,
-      mente: entry.mente,
-      espirito: entry.espirito,
-      updated_at: new Date(entry.updatedAt).toISOString(),
-    }, { onConflict: 'user_id,date' });
+    const { error } = await upsertEntries([entryRow(currentUserId, iso, entry)]);
     if (error) {
       console.error(error);
       showToast('Salvo localmente, sem conexão com a nuvem agora');
@@ -663,6 +734,18 @@
 
   // --- Autosave ---
   let saveTimer = null;
+  function commitEntry(entry) {
+    clearTimeout(saveTimer);
+    entry.updatedAt = Date.now();
+    state.entries[selectedDate] = entry;
+    if (saveState()) {
+      el.saveIndicator.textContent = `Salvo às ${new Date(entry.updatedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+      renderHeatmap();
+      renderStats();
+      renderHistory();
+    }
+    syncEntryToCloud(selectedDate, entry);
+  }
   function scheduleSave() {
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
@@ -670,19 +753,30 @@
       entry.corpo = el.corpoInput.value;
       entry.mente = el.menteInput.value;
       entry.espirito = el.espiritoInput.value;
-      entry.updatedAt = Date.now();
-      state.entries[selectedDate] = entry;
-      if (saveState()) {
-        el.saveIndicator.textContent = `Salvo às ${new Date(entry.updatedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
-        renderHeatmap();
-        renderStats();
-        renderHistory();
-      }
-      syncEntryToCloud(selectedDate, entry);
+      commitEntry(entry);
     }, 400);
   }
   [el.corpoInput, el.menteInput, el.espiritoInput].forEach(input => {
     input.addEventListener('input', scheduleSave);
+  });
+
+  // --- Copiar dia anterior ---
+  el.copyPrevBtn.addEventListener('click', () => {
+    const prevIso = addDays(selectedDate, -1);
+    if (prevIso < state.startDate) return;
+    const prev = getEntry(prevIso);
+    const hasPrev = AREAS.some(k => (prev[k] && prev[k].trim()) || prev.notas[k] != null);
+    if (!hasPrev) { showToast('O dia anterior está vazio'); return; }
+    const cur = getEntry(selectedDate);
+    const curHas = AREAS.some(k => (cur[k] && cur[k].trim()) || cur.notas[k] != null);
+    if (curHas && !confirm('Substituir o que já está preenchido neste dia pelo dia anterior?')) return;
+    const entry = {
+      corpo: prev.corpo || '', mente: prev.mente || '', espirito: prev.espirito || '',
+      notas: { ...prev.notas }, updatedAt: null,
+    };
+    commitEntry(entry);
+    renderForm();
+    showToast('Dia anterior copiado');
   });
 
   // --- Navigation ---

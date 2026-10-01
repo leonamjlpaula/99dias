@@ -40,3 +40,16 @@ Para desativar a notificação do Mac:
 ```bash
 launchctl unload ~/Library/LaunchAgents/com.99dias.reminder.plist
 ```
+
+## Notas por área (0–5)
+
+Para sincronizar as notas na nuvem, rode no SQL Editor do Supabase:
+
+```sql
+alter table entries
+  add column if not exists nota_corpo smallint check (nota_corpo between 0 and 5),
+  add column if not exists nota_mente smallint check (nota_mente between 0 and 5),
+  add column if not exists nota_espirito smallint check (nota_espirito between 0 and 5);
+```
+
+Sem essas colunas o app continua funcionando, mas as notas ficam só no aparelho.
