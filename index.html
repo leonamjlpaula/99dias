@@ -290,7 +290,7 @@
     <div class="legend">
       <span><i style="background:var(--bg)"></i>Vazio</span>
       <span>★ soma das notas do dia · último quadrado da linha = soma da semana (máx. 75, só dias úteis)</span>
-      <span><i style="background:linear-gradient(90deg, var(--bg), hsl(145 55% 40%))"></i>cor pela soma das notas (0 a 15)</span>
+      <span><i style="background:linear-gradient(135deg, var(--corpo), var(--mente), var(--espirito))"></i>cada cor = uma área, mais forte = nota maior</span>
       <span><i style="border-style:dashed;background:transparent"></i>fim de semana (inativo)</span>
     </div>
   </section>
@@ -557,9 +557,13 @@
       if (weekend) {
         cell.classList.add('weekend');
       } else if (sum) {
-        const ratio = Math.min(sum / MAX_DAY_SCORE, 1);
-        cell.style.background = `color-mix(in srgb, hsl(145 55% 40%) ${Math.round(ratio * 100)}%, var(--bg))`;
-        if (ratio > 0.45) cell.classList.add('strong');
+        const n = state.entries[iso].notas;
+        const stops = AREAS.map(k => {
+          const pct = Math.round(Math.min((n[k] || 0) / 5, 1) * 100);
+          return `color-mix(in srgb, var(--${k}) ${pct}%, var(--bg))`;
+        });
+        cell.style.background = `linear-gradient(135deg, ${stops.join(', ')})`;
+        if (sum / MAX_DAY_SCORE > 0.45) cell.classList.add('strong');
       }
       cell.innerHTML = `<span>${i + 1}</span><span class="hc-date">${iso.slice(8)}/${iso.slice(5, 7)}</span>` +
         (sum !== null ? `<span class="hc-sum">★ ${sum}</span>` : '');
