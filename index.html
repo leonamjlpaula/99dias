@@ -129,11 +129,11 @@
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
     grid-column: 8; font-size: 13px; font-weight: 700; color: var(--text); white-space: nowrap;
   }
-  .week-total small { font-size: 8.5px; font-weight: 400; color: var(--text-dim); line-height: 1; }
+  .week-total small { font-size: 8.5px; font-weight: 400; color: inherit; opacity: 0.8; line-height: 1; }
   .heat-cell.future { cursor: default; opacity: 0.35; }
   .heat-cell.selected { box-shadow: 0 0 0 2px var(--accent) inset; }
   .heat-cell.weekend { cursor: default; opacity: 0.35; background: transparent; border-style: dashed; }
-  .heat-cell.strong { color: #fff; font-weight: 600; }
+  .week-total.strong, .heat-cell.strong { color: #fff; font-weight: 600; }
   .legend { display: flex; gap: 14px; margin-top: 10px; font-size: 11.5px; color: var(--text-dim); flex-wrap: wrap; }
   .legend span { display: inline-flex; align-items: center; gap: 5px; }
   .legend i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; border: 1px solid var(--border); }
@@ -545,6 +545,7 @@
     el.heatmap.innerHTML = '';
     const today = todayISO();
     let weekSum = 0;
+    const weekAreas = { corpo: 0, mente: 0, espirito: 0 };
     for (let i = 0; i < TOTAL_DAYS; i++) {
       const iso = addDays(state.startDate, i);
       const dow = fromISO(iso).getDay();
@@ -568,6 +569,7 @@
       cell.innerHTML = `<span>${i + 1}</span><span class="hc-date">${iso.slice(8)}/${iso.slice(5, 7)}</span>` +
         (sum !== null ? `<span class="hc-sum">★ ${sum}</span>` : '');
       weekSum += sum || 0;
+      if (!weekend && sum) AREAS.forEach(k => { weekAreas[k] += state.entries[iso].notas[k] || 0; });
       cell.title = `Dia ${i + 1} — ${fmtDate(iso)}` + (weekend ? ' (fim de semana)' : '');
       if (!weekend && iso <= maxSelectable()) {
         cell.addEventListener('click', () => {
@@ -582,9 +584,16 @@
         wt.className = 'week-total';
         const weekNo = Math.floor(i / 7) + 1;
         wt.title = `Soma da semana ${weekNo}`;
+        const wStops = AREAS.map(k => {
+          const pct = Math.round(Math.min(weekAreas[k] / (MAX_WEEK_SCORE / 3), 1) * 100);
+          return `color-mix(in srgb, var(--${k}) ${pct}%, var(--bg))`;
+        });
+        wt.style.background = `linear-gradient(135deg, ${wStops.join(', ')})`;
+        if (weekSum / MAX_WEEK_SCORE > 0.45) wt.classList.add('strong');
         wt.innerHTML = `<span>${weekSum}/${MAX_WEEK_SCORE}</span><small>${weekNo}ª semana</small>`;
         el.heatmap.appendChild(wt);
         weekSum = 0;
+        AREAS.forEach(k => { weekAreas[k] = 0; });
       }
     }
   }
