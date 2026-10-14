@@ -127,14 +127,13 @@
   .week-total {
     aspect-ratio: 1; border-radius: 5px; border: 1px dashed var(--border);
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
-    grid-column: 8; font-size: 15px; font-weight: 700; color: var(--text);
+    grid-column: 8; font-size: 13px; font-weight: 700; color: var(--text); white-space: nowrap;
   }
   .week-total small { font-size: 8.5px; font-weight: 400; color: var(--text-dim); line-height: 1; }
   .heat-cell.future { cursor: default; opacity: 0.35; }
   .heat-cell.selected { box-shadow: 0 0 0 2px var(--accent) inset; }
-  .heat-cell.level-1 { background: var(--corpo-bg); }
-  .heat-cell.level-2 { background: linear-gradient(135deg, var(--corpo-bg), var(--mente-bg)); }
-  .heat-cell.level-3 { background: linear-gradient(135deg, var(--corpo), var(--mente), var(--espirito)); color: #fff; font-weight: 600; }
+  .heat-cell.weekend { cursor: default; opacity: 0.35; background: transparent; border-style: dashed; }
+  .heat-cell.strong { color: #fff; font-weight: 600; }
   .legend { display: flex; gap: 14px; margin-top: 10px; font-size: 11.5px; color: var(--text-dim); flex-wrap: wrap; }
   .legend span { display: inline-flex; align-items: center; gap: 5px; }
   .legend i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; border: 1px solid var(--border); }
@@ -212,7 +211,8 @@
   }
 
   @media (max-width: 480px) {
-    .heat-cell, .week-total { font-size: 12px; }
+    .heat-cell { font-size: 12px; }
+    .week-total { font-size: 10.5px; }
     .heat-cell .hc-date { font-size: 8px; }
     .heat-cell .hc-sum { font-size: 8.5px; }
     .day-count { font-size: 22px; }
@@ -289,10 +289,9 @@
     <div class="heatmap" id="heatmap"></div>
     <div class="legend">
       <span><i style="background:var(--bg)"></i>Vazio</span>
-      <span>★ soma das notas do dia · último quadrado da linha = soma da semana</span>
-      <span><i style="background:var(--corpo-bg)"></i>1 área</span>
-      <span><i style="background:linear-gradient(135deg, var(--corpo-bg), var(--mente-bg))"></i>2 áreas</span>
-      <span><i style="background:linear-gradient(135deg, var(--corpo), var(--mente), var(--espirito))"></i>3 áreas (completo)</span>
+      <span>★ soma das notas do dia · último quadrado da linha = soma da semana (máx. 75, só dias úteis)</span>
+      <span><i style="background:linear-gradient(90deg, var(--bg), hsl(145 55% 40%))"></i>cor pela soma das notas (0 a 15)</span>
+      <span><i style="border-style:dashed;background:transparent"></i>fim de semana (inativo)</span>
     </div>
   </section>
 
@@ -339,6 +338,8 @@
 (function () {
   const STORAGE_KEY = '99dias-v1';
   const TOTAL_DAYS = 99;
+  const MAX_DAY_SCORE = 15;  // 3 áreas × nota 5
+  const MAX_WEEK_SCORE = 75; // 5 dias úteis × 15
   const SUPABASE_URL = 'https://bftabjdnqbzieerjpuau.supabase.co';
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJmdGFiamRucWJ6aWVlcmpwdWF1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA2MzcxNTcsImV4cCI6MjEwNjIxMzE1N30.PD9BJ5DrHDPIomuJvFRqJsRvNYxqW5yrfDnwkptRezA';
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -546,17 +547,25 @@
     let weekSum = 0;
     for (let i = 0; i < TOTAL_DAYS; i++) {
       const iso = addDays(state.startDate, i);
-      const level = levelOf(iso);
+      const dow = fromISO(iso).getDay();
+      const weekend = dow === 0 || dow === 6;
       const cell = document.createElement('div');
-      cell.className = `heat-cell level-${level}`;
+      cell.className = 'heat-cell';
       if (iso > today) cell.classList.add('future');
       if (iso === selectedDate) cell.classList.add('selected');
-      const sum = notesSum(iso);
+      const sum = weekend ? null : notesSum(iso);
+      if (weekend) {
+        cell.classList.add('weekend');
+      } else if (sum) {
+        const ratio = Math.min(sum / MAX_DAY_SCORE, 1);
+        cell.style.background = `color-mix(in srgb, hsl(145 55% 40%) ${Math.round(ratio * 100)}%, var(--bg))`;
+        if (ratio > 0.45) cell.classList.add('strong');
+      }
       cell.innerHTML = `<span>${i + 1}</span><span class="hc-date">${iso.slice(8)}/${iso.slice(5, 7)}</span>` +
         (sum !== null ? `<span class="hc-sum">★ ${sum}</span>` : '');
       weekSum += sum || 0;
-      cell.title = `Dia ${i + 1} — ${fmtDate(iso)}`;
-      if (iso <= maxSelectable()) {
+      cell.title = `Dia ${i + 1} — ${fmtDate(iso)}` + (weekend ? ' (fim de semana)' : '');
+      if (!weekend && iso <= maxSelectable()) {
         cell.addEventListener('click', () => {
           selectedDate = iso;
           renderAll();
@@ -567,8 +576,9 @@
       if (i % 7 === 6 || i === TOTAL_DAYS - 1) {
         const wt = document.createElement('div');
         wt.className = 'week-total';
-        wt.title = `Soma da semana ${Math.floor(i / 7) + 1}`;
-        wt.innerHTML = `<span>${weekSum}</span><small>semana</small>`;
+        const weekNo = Math.floor(i / 7) + 1;
+        wt.title = `Soma da semana ${weekNo}`;
+        wt.innerHTML = `<span>${weekSum}/${MAX_WEEK_SCORE}</span><small>${weekNo}ª semana</small>`;
         el.heatmap.appendChild(wt);
         weekSum = 0;
       }
